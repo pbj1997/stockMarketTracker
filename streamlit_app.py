@@ -1,68 +1,57 @@
-# streamlit_kospi_dashboard.py
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import datetime
 
-# Title of the dashboard
-st.title("KOSPI & KOSDAQ Stock Information Dashboard")
+# Set the title of the app
+st.title("Stock Information Dashboard")
 
-# Sidebar for input settings
-st.sidebar.header("Settings")
+# Sidebar for stock selection
+st.sidebar.header("Select Stock")
+stock_symbol = st.sidebar.text_input("Enter stock ticker (e.g., AAPL, TSLA, MSFT)", value="AAPL")
 
-# Select start and end date for historical data
-start_date = st.sidebar.date_input("Start Date", datetime.date(2021, 1, 1))
-end_date = st.sidebar.date_input("End Date", datetime.date.today())
+# Get the stock data
+@st.cache
+def get_stock_data(symbol):
+    stock = yf.Ticker(symbol)
+    return stock
 
-# Function to get stock data
-def get_stock_data(ticker):
-    stock = yf.Ticker(ticker)
-    return stock.history(start=start_date, end=end_date)
+# Fetch the data
+stock_data = get_stock_data(stock_symbol)
 
-# Fetching KOSPI and KOSDAQ data
-kospi_data = get_stock_data("^KS11")  # KOSPI Index ticker
-kosdaq_data = get_stock_data("^KQ11")  # KOSDAQ Index ticker
+# Display basic stock information
+st.subheader(f"{stock_symbol.upper()} Stock Information")
 
-# Display KOSPI and KOSDAQ indices with chart
-st.subheader("KOSPI Index")
-st.line_chart(kospi_data['Close'])
+# Get the stock info and display
+info = stock_data.info
+st.write("**Company Name:**", info.get('longName', 'N/A'))
+st.write("**Sector:**", info.get('sector', 'N/A'))
+st.write("**Industry:**", info.get('industry', 'N/A'))
+st.write("**Market Cap:**", info.get('marketCap', 'N/A'))
+st.write("**Previous Close:**", info.get('previousClose', 'N/A'))
+st.write("**Open:**", info.get('open', 'N/A'))
+st.write("**52 Week High:**", info.get('fiftyTwoWeekHigh', 'N/A'))
+st.write("**52 Week Low:**", info.get('fiftyTwoWeekLow', 'N/A'))
 
-st.subheader("KOSDAQ Index")
-st.line_chart(kosdaq_data['Close'])
+# Fetch historical market data
+st.subheader(f"Stock Price Data for {stock_symbol.upper()}")
+period = st.sidebar.selectbox("Select period", ["1d", "5d", "1mo", "3mo", "6mo", "1y", "5y", "10y", "ytd", "max"], index=6)
+history = stock_data.history(period=period)
 
-# Calculate the percentage change for KOSPI and KOSDAQ
-kospi_change = ((kospi_data['Close'][-1] - kospi_data['Close'][0]) / kospi_data['Close'][0]) * 100
-kosdaq_change = ((kosdaq_data['Close'][-1] - kosdaq_data['Close'][0]) / kosdaq_data['Close'][0]) * 100
+# Display the historical data in a table
+st.write(history)
 
-# Display percentage increase rates
-st.write(f"**KOSPI Increase Rate**: {kospi_change:.2f}%")
-st.write(f"**KOSDAQ Increase Rate**: {kosdaq_change:.2f}%")
+# Display historical data as a chart
+st.line_chart(history['Close'])
 
-# Function to get top gainers and losers from the KOSPI market
-def get_top_movers(index_ticker, top_n=5):
-    # Get the components of the index (here we'll simulate a few stocks for demonstration)
-    tickers = ['005930.KS', '000660.KS', '035420.KS', '005380.KS', '051910.KS']  # Samsung, SK Hynix, NAVER, Hyundai, LG
-    stock_data = {ticker: yf.Ticker(ticker).history(period="1d")['Close'].iloc[-1] for ticker in tickers}
+# Display recent news
+st.subheader(f"{stock_symbol.upper()} News")
+news = stock_data.news
+for article in news[:5]:  # Display top 5 news articles
+    st.write(f"**{article['title']}**")
+    st.write(article['link'])
 
-    # Convert the dictionary into a DataFrame
-    stock_df = pd.DataFrame(list(stock_data.items()), columns=['Ticker', 'Close'])
-    stock_df['Change (%)'] = stock_df['Close'].pct_change() * 100
+# Sidebar info
+st.sidebar.markdown("## About the app")
+st.sidebar.info("This is a stock information dashboard built using Streamlit and yfinance.")
 
-    # Get top gainers and losers
-    top_gainers = stock_df.sort_values(by='Change (%)', ascending=False).head(top_n)
-    top_losers = stock_df.sort_values(by='Change (%)').head(top_n)
-
-    return top_gainers, top_losers
-
-# Fetch top movers in the KOSPI market
-st.subheader("Top Gainers and Losers in KOSPI")
-top_gainers, top_losers = get_top_movers("^KS11")
-
-# Display top gainers
-st.write("### Top Gainers")
-st.dataframe(top_gainers)
-
-# Display top losers
-st.write("### Top Losers")
-st.dataframe(top_losers)
+# Run the app using: streamlit run stock_app.py
