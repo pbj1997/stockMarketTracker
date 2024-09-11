@@ -10,48 +10,40 @@ st.sidebar.header("Select Stock")
 stock_symbol = st.sidebar.text_input("Enter stock ticker (e.g., AAPL, TSLA, MSFT)", value="AAPL")
 
 # Get the stock data
-@st.cache
+@st.cache_data
 def get_stock_data(symbol):
     stock = yf.Ticker(symbol)
-    return stock
+    # Fetch only relevant data that is cacheable
+    stock_info = stock.info
+    history = stock.history(period='1y')  # For example, get 1 year of historical data
+    return stock_info, history
 
 # Fetch the data
-stock_data = get_stock_data(stock_symbol)
+try:
+    stock_info, stock_history = get_stock_data(stock_symbol)
 
-# Display basic stock information
-st.subheader(f"{stock_symbol.upper()} Stock Information")
+    # Display basic stock information
+    st.subheader(f"{stock_symbol.upper()} Stock Information")
+    st.write("**Company Name:**", stock_info.get('longName', 'N/A'))
+    st.write("**Sector:**", stock_info.get('sector', 'N/A'))
+    st.write("**Industry:**", stock_info.get('industry', 'N/A'))
+    st.write("**Market Cap:**", stock_info.get('marketCap', 'N/A'))
+    st.write("**Previous Close:**", stock_info.get('previousClose', 'N/A'))
+    st.write("**52 Week High:**", stock_info.get('fiftyTwoWeekHigh', 'N/A'))
+    st.write("**52 Week Low:**", stock_info.get('fiftyTwoWeekLow', 'N/A'))
 
-# Get the stock info and display
-info = stock_data.info
-st.write("**Company Name:**", info.get('longName', 'N/A'))
-st.write("**Sector:**", info.get('sector', 'N/A'))
-st.write("**Industry:**", info.get('industry', 'N/A'))
-st.write("**Market Cap:**", info.get('marketCap', 'N/A'))
-st.write("**Previous Close:**", info.get('previousClose', 'N/A'))
-st.write("**Open:**", info.get('open', 'N/A'))
-st.write("**52 Week High:**", info.get('fiftyTwoWeekHigh', 'N/A'))
-st.write("**52 Week Low:**", info.get('fiftyTwoWeekLow', 'N/A'))
+    # Fetch historical market data
+    st.subheader(f"Stock Price Data for {stock_symbol.upper()}")
 
-# Fetch historical market data
-st.subheader(f"Stock Price Data for {stock_symbol.upper()}")
-period = st.sidebar.selectbox("Select period", ["1d", "5d", "1mo", "3mo", "6mo", "1y", "5y", "10y", "ytd", "max"], index=6)
-history = stock_data.history(period=period)
+    # Display the historical data in a table
+    st.write(stock_history)
 
-# Display the historical data in a table
-st.write(history)
+    # Display historical data as a chart
+    st.line_chart(stock_history['Close'])
 
-# Display historical data as a chart
-st.line_chart(history['Close'])
-
-# Display recent news
-st.subheader(f"{stock_symbol.upper()} News")
-news = stock_data.news
-for article in news[:5]:  # Display top 5 news articles
-    st.write(f"**{article['title']}**")
-    st.write(article['link'])
+except Exception as e:
+    st.error(f"An error occurred: {e}")
 
 # Sidebar info
 st.sidebar.markdown("## About the app")
 st.sidebar.info("This is a stock information dashboard built using Streamlit and yfinance.")
-
-# Run the app using: streamlit run stock_app.py
