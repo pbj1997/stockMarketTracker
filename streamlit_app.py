@@ -1,151 +1,68 @@
+# streamlit_kospi_dashboard.py
+
 import streamlit as st
+import yfinance as yf
 import pandas as pd
-import math
-from pathlib import Path
+import datetime
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+# Title of the dashboard
+st.title("KOSPI & KOSDAQ Stock Information Dashboard")
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# Sidebar for input settings
+st.sidebar.header("Settings")
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+# Select start and end date for historical data
+start_date = st.sidebar.date_input("Start Date", datetime.date(2021, 1, 1))
+end_date = st.sidebar.date_input("End Date", datetime.date.today())
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+# Function to get stock data
+def get_stock_data(ticker):
+    stock = yf.Ticker(ticker)
+    return stock.history(start=start_date, end=end_date)
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+# Fetching KOSPI and KOSDAQ data
+kospi_data = get_stock_data("^KS11")  # KOSPI Index ticker
+kosdaq_data = get_stock_data("^KQ11")  # KOSDAQ Index ticker
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+# Display KOSPI and KOSDAQ indices with chart
+st.subheader("KOSPI Index")
+st.line_chart(kospi_data['Close'])
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+st.subheader("KOSDAQ Index")
+st.line_chart(kosdaq_data['Close'])
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+# Calculate the percentage change for KOSPI and KOSDAQ
+kospi_change = ((kospi_data['Close'][-1] - kospi_data['Close'][0]) / kospi_data['Close'][0]) * 100
+kosdaq_change = ((kosdaq_data['Close'][-1] - kosdaq_data['Close'][0]) / kosdaq_data['Close'][0]) * 100
 
-    return gdp_df
+# Display percentage increase rates
+st.write(f"**KOSPI Increase Rate**: {kospi_change:.2f}%")
+st.write(f"**KOSDAQ Increase Rate**: {kosdaq_change:.2f}%")
 
-gdp_df = get_gdp_data()
+# Function to get top gainers and losers from the KOSPI market
+def get_top_movers(index_ticker, top_n=5):
+    # Get the components of the index (here we'll simulate a few stocks for demonstration)
+    tickers = ['005930.KS', '000660.KS', '035420.KS', '005380.KS', '051910.KS']  # Samsung, SK Hynix, NAVER, Hyundai, LG
+    stock_data = {ticker: yf.Ticker(ticker).history(period="1d")['Close'].iloc[-1] for ticker in tickers}
 
-# -----------------------------------------------------------------------------
-# Draw the actual page
+    # Convert the dictionary into a DataFrame
+    stock_df = pd.DataFrame(list(stock_data.items()), columns=['Ticker', 'Close'])
+    stock_df['Change (%)'] = stock_df['Close'].pct_change() * 100
 
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
+    # Get top gainers and losers
+    top_gainers = stock_df.sort_values(by='Change (%)', ascending=False).head(top_n)
+    top_losers = stock_df.sort_values(by='Change (%)').head(top_n)
 
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
+    return top_gainers, top_losers
 
-# Add some spacing
-''
-''
+# Fetch top movers in the KOSPI market
+st.subheader("Top Gainers and Losers in KOSPI")
+top_gainers, top_losers = get_top_movers("^KS11")
 
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
+# Display top gainers
+st.write("### Top Gainers")
+st.dataframe(top_gainers)
 
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+# Display top losers
+st.write("### Top Losers")
+st.dataframe(top_losers)
