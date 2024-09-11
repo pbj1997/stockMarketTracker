@@ -1,49 +1,36 @@
-import streamlit as st
-import yfinance as yf
-import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 
-# Set the title of the app
-st.title("Stock Information Dashboard")
+# Function to get weather information from Naver
+def get_weather(city_name):
+    # Naver Weather URL (this is just an example URL; you may need to adjust the query based on the city)
+    url = f"https://search.naver.com/search.naver?query={city_name}+날씨"
+    
+    # Send a request to the website
+    response = requests.get(url)
+    
+    # Parse the HTML content using BeautifulSoup
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Extract the temperature
+    temperature = soup.find('div', class_='temperature_text').get_text(strip=True)
+    
+    # Extract the weather condition
+    condition = soup.find('p', class_='summary').get_text(strip=True)
+    
+    # Extract additional information (like rain probability, wind, etc.)
+    rain = soup.find('span', class_='rainfall').get_text(strip=True)
+    
+    # Print the extracted weather information
+    print(f"City: {city_name}")
+    print(f"Temperature: {temperature}")
+    print(f"Weather Condition: {condition}")
+    print(f"Rain Probability: {rain}")
 
-# Sidebar for stock selection
-st.sidebar.header("Select Stock")
-stock_symbol = st.sidebar.text_input("Enter stock ticker (e.g., AAPL, TSLA, MSFT)", value="AAPL")
-
-# Get the stock data
-@st.cache_data
-def get_stock_data(symbol):
-    stock = yf.Ticker(symbol)
-    # Fetch only relevant data that is cacheable
-    stock_info = stock.info
-    history = stock.history(period='1y')  # For example, get 1 year of historical data
-    return stock_info, history
-
-# Fetch the data
-try:
-    stock_info, stock_history = get_stock_data(stock_symbol)
-
-    # Display basic stock information
-    st.subheader(f"{stock_symbol.upper()} Stock Information")
-    st.write("**Company Name:**", stock_info.get('longName', 'N/A'))
-    st.write("**Sector:**", stock_info.get('sector', 'N/A'))
-    st.write("**Industry:**", stock_info.get('industry', 'N/A'))
-    st.write("**Market Cap:**", stock_info.get('marketCap', 'N/A'))
-    st.write("**Previous Close:**", stock_info.get('previousClose', 'N/A'))
-    st.write("**52 Week High:**", stock_info.get('fiftyTwoWeekHigh', 'N/A'))
-    st.write("**52 Week Low:**", stock_info.get('fiftyTwoWeekLow', 'N/A'))
-
-    # Fetch historical market data
-    st.subheader(f"Stock Price Data for {stock_symbol.upper()}")
-
-    # Display the historical data in a table
-    st.write(stock_history)
-
-    # Display historical data as a chart
-    st.line_chart(stock_history['Close'])
-
-except Exception as e:
-    st.error(f"An error occurred: {e}")
-
-# Sidebar info
-st.sidebar.markdown("## About the app")
-st.sidebar.info("This is a stock information dashboard built using Streamlit and yfinance.")
+# Main code
+if __name__ == '__main__':
+    # User input for the city name (in Korean, as the Naver Weather page is in Korean)
+    city = input("Enter the city name in Korean (e.g., 서울 for Seoul): ")
+    
+    # Get and display the weather for the input city
+    get_weather(city)
